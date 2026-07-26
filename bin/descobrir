@@ -32,19 +32,36 @@ echo
 
 # --- 2. Bater em todos os endereços ---------------------------------------
 #
-# São 254 endereços. Um de cada vez levaria um minuto, então mandamos todos os
-# pings ao mesmo tempo (o `&` joga para segundo plano) e esperamos no fim.
+# São 254 endereços. Um de cada vez levaria um minuto, então mandamos vários
+# pings ao mesmo tempo (o `&` joga para segundo plano).
+#
+# Mas não todos de uma vez: 254 processos simultâneos estouram o limite de
+# processos de um container (e o de várias máquinas), e o erro que aparece é
+# "fork: Resource temporarily unavailable" — a varredura morre pela metade sem
+# avisar que o resultado está incompleto.
+#
+# Por isso mantemos no máximo LOTE pings no ar. O `wait -n` espera *qualquer*
+# um terminar e libera uma vaga, então a varredura anda em ritmo constante sem
+# nunca passar do teto.
 #
 # -c 1  manda um único ping
 # -W 1  desiste depois de 1 segundo
-# O resultado de cada um vai para um arquivo com o nome do IP; quem responder
-# deixa arquivo, quem não responder não deixa.
+# Quem responder deixa um arquivo com o nome do IP; quem não responder não deixa.
+LOTE=32
+
 vivos=$(mktemp -d)
 trap 'rm -rf "$vivos"' EXIT
 
+no_ar=0
 for final in $(seq 1 254); do
     alvo="${prefixo}.${final}"
     ( ping -c 1 -W 1 "$alvo" >/dev/null 2>&1 && touch "$vivos/$alvo" ) &
+
+    no_ar=$((no_ar + 1))
+    if (( no_ar >= LOTE )); then
+        wait -n
+        no_ar=$((no_ar - 1))
+    fi
 done
 wait
 
