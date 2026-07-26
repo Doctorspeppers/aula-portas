@@ -40,10 +40,15 @@ echo "  seu endereço:  $meu_ip"
 echo "  seu colega roda: conectar $meu_ip $porta"
 echo
 echo "Quando alguém conectar, o que você digitar aqui aparece lá, e vice-versa."
+echo "Atende UMA conexão: quando ela terminar, rode de novo para o próximo."
 echo "Para encerrar, Ctrl+C."
 echo "---"
 
 # -l  ficar escutando em vez de conectar
 # -v  contar o que está acontecendo (quem conectou)
+# -n  não traduzir IP em nome. Sem isto o nc tenta um DNS reverso que falha
+#     em rede isolada e imprime "getnameinfo: Temporary failure in name
+#     resolution" — um erro que não significa nada e assusta quem está
+#     aprendendo. De quebra, mostrar o IP de quem conectou é o que a aula quer.
 # -p  em qual porta
-exec nc -l -v -p "$porta"
+exec nc -l -v -n -p "$porta"

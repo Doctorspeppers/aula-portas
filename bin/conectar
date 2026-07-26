@@ -26,22 +26,37 @@ if ! [[ "$porta" =~ ^[0-9]+$ ]] || (( porta < 1 || porta > 65535 )); then
 fi
 
 echo "conectando em $alvo na porta $porta ..."
-echo
+echo "(se conectar, o que você digitar aparece na tela do colega; Ctrl+C encerra)"
+echo "---"
 
-# -w 5 desiste depois de 5 segundos em vez de ficar pendurado para sempre.
-# Sem isso, um IP errado trava o terminal do aluno sem explicar nada.
-if ! nc -z -w 5 "$alvo" "$porta" 2>/dev/null; then
+# Aqui NÃO testamos a porta antes de conectar, por mais tentador que seja para
+# dar uma mensagem de erro bonita. O `escutar` do outro lado aceita UMA conexão
+# e encerra — um teste prévio seria essa conexão, e a de verdade chegaria depois
+# do servidor já ter saído. O sintoma é cruel: o teste passa e a conexão falha.
+#
+# Então conectamos de uma vez e explicamos depois, se der errado.
+#
+# -v faz o nc dizer o que aconteceu; -w 8 desiste em vez de pendurar o terminal
+# para sempre quando o IP não existe.
+inicio=$SECONDS
+nc -v -w 8 "$alvo" "$porta"
+status=$?
+duracao=$((SECONDS - inicio))
+
+# Falhou rápido = nunca chegou a conectar. Se durou, houve conversa e a saída
+# foi um Ctrl+C — que também devolve status diferente de zero, e aí explicar
+# "não consegui conectar" seria mentira.
+if (( status != 0 && duracao < 2 )); then
+    echo >&2
     echo "não consegui conectar em $alvo:$porta." >&2
     echo >&2
     echo "As causas mais comuns, em ordem:" >&2
     echo "  1. ninguém rodou 'escutar $porta' do outro lado ainda" >&2
-    echo "  2. o colega escutou numa porta diferente da que você tentou" >&2
-    echo "  3. o IP está errado — rode 'descobrir' para conferir" >&2
+    echo "  2. o colega escutou, mas alguém já conectou antes de você —" >&2
+    echo "     o escutar atende uma conexão por vez; peça para ele rodar de novo" >&2
+    echo "  3. a porta combinada não é a mesma dos dois lados" >&2
+    echo "  4. o IP está errado — rode 'descobrir' para conferir" >&2
     exit 1
 fi
 
-echo "conectado. O que você digitar aparece na tela do colega."
-echo "Para encerrar, Ctrl+C."
-echo "---"
-
-exec nc -v "$alvo" "$porta"
+exit $status
