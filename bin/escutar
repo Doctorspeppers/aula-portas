@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+#
+# escutar — abre uma porta nesta máquina e espera alguém conectar.
+#
+# Este é o lado "servidor" da conversa. Quem escuta chega primeiro; quem conecta
+# precisa que já tenha alguém esperando, senão leva "connection refused".
+
+set -uo pipefail
+
+porta=${1:-}
+
+if [[ -z "$porta" ]]; then
+    echo "uso: escutar PORTA"
+    echo
+    echo "exemplo: escutar 4444"
+    echo
+    echo "Depois disso, peça a um colega para rodar:"
+    echo "  conectar $(ip -4 -o addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1) 4444"
+    exit 1
+fi
+
+# Portas abaixo de 1024 são reservadas e exigem privilégio; acima de 65535 não
+# existem. Avisar aqui é mais claro que deixar o nc falhar com a mensagem dele.
+if ! [[ "$porta" =~ ^[0-9]+$ ]] || (( porta < 1 || porta > 65535 )); then
+    echo "porta inválida: $porta (use um número de 1 a 65535)" >&2
+    exit 1
+fi
+
+if (( porta < 1024 )); then
+    echo "aviso: portas abaixo de 1024 são reservadas para serviços do sistema."
+    echo "       se der erro de permissão, escolha algo como 4444 ou 8080."
+    echo
+fi
+
+meu_ip=$(ip -4 -o addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1)
+
+echo "abrindo a porta $porta e esperando..."
+echo
+echo "  seu endereço:  $meu_ip"
+echo "  seu colega roda: conectar $meu_ip $porta"
+echo
+echo "Quando alguém conectar, o que você digitar aqui aparece lá, e vice-versa."
+echo "Para encerrar, Ctrl+C."
+echo "---"
+
+# -l  ficar escutando em vez de conectar
+# -v  contar o que está acontecendo (quem conectou)
+# -p  em qual porta
+exec nc -l -v -p "$porta"

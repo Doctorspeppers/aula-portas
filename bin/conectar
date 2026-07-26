@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+#
+# conectar — liga na porta que um colega abriu.
+#
+# Este é o lado "cliente". Só funciona se do outro lado alguém já tiver rodado
+# `escutar` na mesma porta: uma porta sem ninguém escutando recusa a conexão na
+# hora, e é isso que significa "connection refused".
+
+set -uo pipefail
+
+alvo=${1:-}
+porta=${2:-}
+
+if [[ -z "$alvo" || -z "$porta" ]]; then
+    echo "uso: conectar IP PORTA"
+    echo
+    echo "exemplo: conectar 10.99.0.7 4444"
+    echo
+    echo "Não sabe o IP do colega? Rode:  descobrir"
+    exit 1
+fi
+
+if ! [[ "$porta" =~ ^[0-9]+$ ]] || (( porta < 1 || porta > 65535 )); then
+    echo "porta inválida: $porta (use um número de 1 a 65535)" >&2
+    exit 1
+fi
+
+echo "conectando em $alvo na porta $porta ..."
+echo
+
+# -w 5 desiste depois de 5 segundos em vez de ficar pendurado para sempre.
+# Sem isso, um IP errado trava o terminal do aluno sem explicar nada.
+if ! nc -z -w 5 "$alvo" "$porta" 2>/dev/null; then
+    echo "não consegui conectar em $alvo:$porta." >&2
+    echo >&2
+    echo "As causas mais comuns, em ordem:" >&2
+    echo "  1. ninguém rodou 'escutar $porta' do outro lado ainda" >&2
+    echo "  2. o colega escutou numa porta diferente da que você tentou" >&2
+    echo "  3. o IP está errado — rode 'descobrir' para conferir" >&2
+    exit 1
+fi
+
+echo "conectado. O que você digitar aparece na tela do colega."
+echo "Para encerrar, Ctrl+C."
+echo "---"
+
+exec nc -v "$alvo" "$porta"

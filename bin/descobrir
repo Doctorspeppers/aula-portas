@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+#
+# descobrir — mostra quem está ligado na rede da sala.
+#
+# Como funciona: manda um ping para cada endereço possível da rede e anota quem
+# responde. É o mesmo princípio de bater em todas as portas de um corredor para
+# ver quais quartos estão ocupados.
+#
+# Leia este arquivo. Ele é curto de propósito — não tem mágica nenhuma aqui,
+# e entender o que ele faz é metade da aula.
+
+set -uo pipefail
+
+# --- 1. Descobrir quem eu sou ---------------------------------------------
+#
+# `ip -4 -o addr show scope global` lista os endereços IPv4 desta máquina.
+# A saída tem a forma "2: eth0  inet 10.99.0.4/24 ...", e o campo 4 é o
+# "10.99.0.4/24" — o IP junto com o tamanho da rede.
+meu_cidr=$(ip -4 -o addr show scope global 2>/dev/null | awk '{print $4}' | head -1)
+
+if [[ -z "$meu_cidr" ]]; then
+    echo "não consegui descobrir meu IP. Esta máquina está em alguma rede?" >&2
+    exit 1
+fi
+
+meu_ip=${meu_cidr%/*}     # tira o "/24" e sobra o IP
+prefixo=${meu_ip%.*}      # tira o último número e sobra "10.99.0"
+rede="${prefixo}.0/24"
+
+echo "varrendo $rede a partir de $meu_ip ..."
+echo
+
+# --- 2. Bater em todos os endereços ---------------------------------------
+#
+# São 254 endereços. Um de cada vez levaria um minuto, então mandamos todos os
+# pings ao mesmo tempo (o `&` joga para segundo plano) e esperamos no fim.
+#
+# -c 1  manda um único ping
+# -W 1  desiste depois de 1 segundo
+# O resultado de cada um vai para um arquivo com o nome do IP; quem responder
+# deixa arquivo, quem não responder não deixa.
+vivos=$(mktemp -d)
+trap 'rm -rf "$vivos"' EXIT
+
+for final in $(seq 1 254); do
+    alvo="${prefixo}.${final}"
+    ( ping -c 1 -W 1 "$alvo" >/dev/null 2>&1 && touch "$vivos/$alvo" ) &
+done
+wait
+
+# --- 3. Mostrar o resultado -----------------------------------------------
+#
+# Para cada IP que respondeu, tentamos descobrir o nome. O `getent hosts`
+# pergunta ao DNS "quem é este IP?" — na rede da sala, o servidor de nomes
+# conhece o container de cada aluno.
+printf '%-14s %s\n' "IP" "NOME"
+
+total=0
+# O sort -t. -k4 -n ordena pelo último número do IP, senão .10 viria antes de .2
+for arquivo in $(ls "$vivos" 2>/dev/null | sort -t. -k4 -n); do
+    ip=$arquivo
+    nome=$(getent hosts "$ip" 2>/dev/null | awk '{print $2}')
+    [[ -z "$nome" ]] && nome="(sem nome)"
+
+    marca=""
+    [[ "$ip" == "$meu_ip" ]] && marca="   <- você"
+
+    printf '%-14s %s%s\n' "$ip" "$nome" "$marca"
+    total=$((total + 1))
+done
+
+echo
+if (( total <= 1 )); then
+    echo "só você por enquanto. Espere os colegas subirem o lab e rode de novo."
+    exit 0
+fi
+
+echo "$total máquinas no ar. Escolha uma porta e combine com um colega:"
+echo
+echo "  você:   escutar 4444"
+echo "  colega: conectar $meu_ip 4444"
