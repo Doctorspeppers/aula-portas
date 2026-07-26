@@ -64,9 +64,17 @@ $ conectar 10.99.0.4 4444
 conectado. O que você digitar aparece na tela do colega.
 ```
 
+**Atenção:** `escutar` atende **uma** conexão e encerra. Quando a conversa
+acabar, quem escutava roda o comando de novo para o próximo. Isso costuma
+confundir na primeira vez — um segundo aluno tentando conectar recebe
+`Connection refused` mesmo tendo combinado a porta certa, porque o servidor já
+saiu. Vale provocar de propósito: é uma boa introdução à diferença entre um
+serviço que atende uma vez e um que fica no ar.
+
 **4. Duas pessoas não cabem na mesma porta.** Peça para um terceiro tentar
-`escutar 4444` na mesma máquina. O `Address already in use` mostra que a porta
-é um recurso exclusivo — só um serviço por porta.
+`escutar 4444` na mesma máquina, enquanto o primeiro ainda espera. O
+`Address already in use` mostra que a porta é um recurso exclusivo — só um
+serviço por porta.
 
 **5. Ver os pacotes.** Com a conversa aberta, num terceiro terminal:
 
