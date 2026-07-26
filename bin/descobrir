@@ -77,6 +77,9 @@ total=0
 for arquivo in $(ls "$vivos" 2>/dev/null | sort -t. -k4 -n); do
     ip=$arquivo
     nome=$(getent hosts "$ip" 2>/dev/null | awk '{print $2}')
+    # O DNS devolve o nome completo, com o domínio da rede grudado
+    # ("maquina.rede-da-sala"). Para a lista fica melhor só a primeira parte.
+    nome=${nome%%.*}
     [[ -z "$nome" ]] && nome="(sem nome)"
 
     marca=""
