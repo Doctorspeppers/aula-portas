@@ -36,17 +36,20 @@ echo "---"
 #
 # Então conectamos de uma vez e explicamos depois, se der errado.
 #
-# -v faz o nc dizer o que aconteceu; -w 8 desiste em vez de pendurar o terminal
-# para sempre quando o IP não existe.
-inicio=$SECONDS
-nc -v -w 8 "$alvo" "$porta"
+# Também não usamos -w: no nc do OpenBSD esse valor não é só timeout para
+# conectar, é também timeout de ociosidade. Numa conversa de aula, alguns
+# segundos sem ninguém digitar são normais, e a conexão cairia sozinha no meio
+# — sem mensagem nenhuma, o pior tipo de falha. Não precisamos dele: nesta rede
+# um IP inexistente já falha em ~3s com "No route to host".
+#
+# -v faz o nc contar o que aconteceu.
+nc -v "$alvo" "$porta"
 status=$?
-duracao=$((SECONDS - inicio))
 
-# Falhou rápido = nunca chegou a conectar. Se durou, houve conversa e a saída
-# foi um Ctrl+C — que também devolve status diferente de zero, e aí explicar
-# "não consegui conectar" seria mentira.
-if (( status != 0 && duracao < 2 )); then
+# O nc devolve 1 quando não conseguiu conectar, e 0 quando houve conversa —
+# inclusive se o aluno encerrou com Ctrl+C. Por isso olhamos o status exato: um
+# "não consegui conectar" depois de uma conversa que funcionou seria mentira.
+if (( status == 1 )); then
     echo >&2
     echo "não consegui conectar em $alvo:$porta." >&2
     echo >&2
